@@ -3,38 +3,15 @@ import argparse
 import sys
 import os
 import inspect
-
-
-try:
-    from dotenv import load_dotenv, find_dotenv
-
-    load_dotenv(dotenv_path=find_dotenv(usecwd=True))
-except ImportError:
-    pass
-
-if not "DJANGO_SETTINGS_MODULE" in os.environ:
-    raise AssertionError("You need DJANGO_SETTINGS_MODULE in your os.environ")
-
-if "DJANGO_CONFIGURATION" in os.environ:
-    try:
-        import configurations
-    except ImportError:
-        pass
-    else:
-        configurations.setup()
-
-
-import django
-
-django.setup()
-
-
-from django.urls.exceptions import NoReverseMatch
-from django.urls.resolvers import URLPattern, get_resolver
-from django.urls.base import get_urlconf, get_ns_resolver
+from pathlib import Path
 
 
 def find_named_view(viewname, urlconf=None, args=None, kwargs=None, current_app=None):
+    from django.urls.exceptions import NoReverseMatch
+    from django.urls.resolvers import get_resolver
+    from django.urls.base import get_urlconf, get_ns_resolver
+
+    # This is copied from Django's `reverse` function, but ends differently.
     if urlconf is None:
         urlconf = get_urlconf()
     resolver = get_resolver(urlconf)
@@ -93,7 +70,7 @@ def find_named_view(viewname, urlconf=None, args=None, kwargs=None, current_app=
     return find_named_view_from_resolver(resolver, view)
 
 
-def find_named_view_from_resolver(resolver, view_name) -> URLPattern | None:
+def find_named_view_from_resolver(resolver, view_name):
     if not resolver._populated:
         resolver._populate()
 
@@ -101,6 +78,7 @@ def find_named_view_from_resolver(resolver, view_name) -> URLPattern | None:
         if hasattr(pattern, "name") and pattern.name == view_name:
             return pattern
         if hasattr(pattern, "url_patterns"):
+            # TODO handle multiple results that match
             result = find_named_view_from_resolver(pattern, view_name)
             if result:
                 return result
@@ -117,6 +95,33 @@ def get_function_location(func):
     return f"{file_path}:{line_num}"
 
 
+def do_setup():
+    try:
+        from dotenv import load_dotenv, find_dotenv
+
+        load_dotenv(dotenv_path=find_dotenv(usecwd=True))
+    except ImportError:
+        pass
+
+    if "DJANGO_SETTINGS_MODULE" not in os.environ:
+        msg = "You need DJANGO_SETTINGS_MODULE in your os.environ or .env file"
+        if "dotenv" not in sys.modules:
+            msg += ' (first do "pip install python-dotenv" to support .env file)'
+        raise AssertionError(msg)
+
+    if "DJANGO_CONFIGURATION" in os.environ:
+        try:
+            import configurations
+        except ImportError:
+            pass
+        else:
+            configurations.setup()
+
+    import django
+
+    django.setup()
+
+
 arg_parser = argparse.ArgumentParser(
     description="For a given Django view name, return filename:linenum where it is implemented."
 )
@@ -126,6 +131,7 @@ arg_parser.add_argument("view_name")
 def main():
     args = arg_parser.parse_args()
     view_name = args.view_name
+    do_setup()
     pattern = find_named_view(view_name)
     if pattern is None:
         print(f"Could not find view called '{view_name}'", file=sys.stderr)
