@@ -1,3 +1,31 @@
+[project]
+name = "django-find-view"
+version = "0.1.0"
+description = "A small CLI tool that locates the file containing a Django view function for a given named URL"
+readme = "README.rst"
+requires-python = ">=3.12"
+dependencies = [
+  'django',
+]
+
+[project.scripts]
+django-find-view = 'django_find_view:main'
+
+
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+
+
 [tool.black]
 line-length = 120
 
